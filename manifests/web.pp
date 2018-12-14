@@ -267,16 +267,22 @@ class zabbix::web (
   # "Warning: You cannot collect without storeconfigs being set"
   if $manage_resources {
     include ruby::dev
+    $compile_packages = $facts['os']['family'] ? {
+      'RedHat' => [ 'make', 'gcc-c++', ],
+      'Debian' => [ 'make', 'g++', ],
+      default  => [],
+    }
+    ensure_packages($compile_packages, { before => Package['zabbixapi'], })
 
     # Determine correct zabbixapi version.
     case $zabbix_version {
-      '2.2' : {
+      '2.2': {
         $zabbixapi_version = '2.2.2'
       }
-      '2.4' : {
+      '2.4': {
         $zabbixapi_version = '2.4.4'
       }
-      default : {
+      default: {
         $zabbixapi_version = '3.2.1'
       }
     }
@@ -304,12 +310,12 @@ class zabbix::web (
   }
 
   case $facts['os']['name'] {
-    'ubuntu', 'debian' : {
+    'ubuntu', 'debian': {
       $zabbix_web_package = 'zabbix-frontend-php'
 
       # Check OS release for proper prefix
       case $facts['os']['name'] {
-        'Ubuntu' : {
+        'Ubuntu': {
           if versioncmp($facts['os']['release']['major'], '16.04') >= 0 {
             $php_db_package = "php-${db}"
           }
@@ -317,7 +323,7 @@ class zabbix::web (
             $php_db_package = "php5-${db}"
           }
         }
-        'Debian' : {
+        'Debian': {
           if versioncmp($facts['os']['release']['major'], '9') >= 0 {
             $php_db_package = "php-${db}"
           }
@@ -325,7 +331,7 @@ class zabbix::web (
             $php_db_package = "php5-${db}"
           }
         }
-        default : {
+        default: {
           $php_db_package = "php5-${db}"
         }
       }
@@ -338,7 +344,7 @@ class zabbix::web (
         ],
       }
     }
-    default : {
+    default: {
       $zabbix_web_package = 'zabbix-web'
 
       package { "zabbix-web-${db}":
