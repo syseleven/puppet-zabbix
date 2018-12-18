@@ -1,6 +1,3 @@
-$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', '..'))
-require 'puppet/util/zabbix'
-
 Puppet::Type.newtype(:zabbix_template_host) do
   @doc = 'Link or Unlink template to host.
 	  Example.
@@ -20,8 +17,6 @@ Puppet::Type.newtype(:zabbix_template_host) do
     newvalues(%r{.+\@.+})
     desc 'template_name@host_name'
   end
-
-  Puppet::Util::Zabbix.add_zabbix_type_methods(self)
 
   autorequire(:zabbix_host) do
     self[:name].split('@')[1]
