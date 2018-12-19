@@ -2,6 +2,43 @@ require_relative '../zabbix'
 Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix) do
   confine feature: :zabbixapi
 
+  mk_resource_methods
+
+  def self.instances
+    proxies = zbx.proxies.all
+    api_hosts = self.zbx.query(
+      method: 'host.get',
+      params: {
+        selectParentTemplates: ['host'],
+       	selectInterfaces: ['ip', 'port', 'useip'],
+        selectGroups: ['name'],
+        output: ['host', 'proxy_hostid']
+      }
+    )
+
+    api_hosts.map do |h|
+      new(
+        ensure: :present,
+        name: h['host'],
+        ipaddress: h['interfaces'][0]['ip'],
+        use_ip: (! h['interfaces'][0]['useip'].to_i.zero?),
+        port: h['interfaces'][0]['port'].to_i,
+        group: h['groups'][0]['name'],
+        group_create: nil,
+        templates: h['parentTemplates'].map { |x| x['host']},
+        proxy: proxies.select { |name,id| id == h['proxy_hostid'] }.keys.first,
+      )
+    end
+  end
+
+  def self.prefetch(resources)
+    instances.each do |prov|
+      if resource = resources[prov.name]
+        resource.provider = prov
+      end
+    end
+  end
+
   def create
     # Set some vars
     host = @resource[:hostname]
@@ -68,27 +105,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
   end
 
   def exists?
-    host = @resource[:hostname]
-    templates = @resource[:templates]
-
-    templates = [templates] unless templates.is_a?(Array)
-
-    host = check_host(host)
-    if host.any?
-      template_ids   = host[0]['parentTemplates'].map { |x| x['templateid'] }
-      template_names = host[0]['parentTemplates'].map { |x| x['host'] }
-      res = []
-      templates.each do |template|
-        if a_number?(template)
-          res.push(template_ids.include?(template))
-        else
-          res.push(template_names.include?(template))
-        end
-      end
-      res.all?
-    else
-      false
-    end
+    @property_hash[:ensure] == :present
   end
 
   def destroy

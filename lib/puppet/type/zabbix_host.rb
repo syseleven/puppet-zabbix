@@ -8,19 +8,22 @@ Puppet::Type.newtype(:zabbix_host) do
     desc 'FQDN of the machine.'
   end
 
-  newparam(:ipaddress) do
+  newproperty(:ipaddress) do
     desc 'The IP address of the machine running zabbix agent.'
   end
 
-  newparam(:use_ip) do
+  newproperty(:use_ip) do
     desc 'Using ipadress instead of dns to connect. Is used by the zabbix-api command.'
   end
 
-  newparam(:port) do
+  newproperty(:port) do
     desc 'The port that the zabbix agent is listening on.'
+    def insync?(is)
+      is.to_i == should.to_i
+    end
   end
 
-  newparam(:group) do
+  newproperty(:group) do
     desc 'Name of the hostgroup.'
   end
 
@@ -28,11 +31,14 @@ Puppet::Type.newtype(:zabbix_host) do
     desc 'Create hostgroup if missing.'
   end
 
-  newparam(:templates) do
+  newproperty(:templates, :array_matching => :all) do
     desc 'List of templates which should be loaded for this host.'
+    def insync?(is)
+      is.sort == should.sort
+    end
   end
 
-  newparam(:proxy) do
+  newproperty(:proxy) do
     desc 'Whether it is monitored by an proxy or not.'
   end
 end
