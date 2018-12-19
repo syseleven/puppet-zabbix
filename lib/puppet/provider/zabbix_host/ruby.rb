@@ -10,19 +10,22 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
       method: 'host.get',
       params: {
         selectParentTemplates: ['host'],
-       	selectInterfaces: ['ip', 'port', 'useip'],
+        selectInterfaces: ['interfaceid', 'type', 'main', 'ip', 'port', 'useip'],
         selectGroups: ['name'],
         output: ['host', 'proxy_hostid']
       }
     )
 
     api_hosts.map do |h|
+      interface = h['interfaces'].select { |i| i['type'].to_i == 1 and i['main'].to_i == 1 }.first
       new(
         ensure: :present,
+        id: h['hostid'].to_i,
         name: h['host'],
-        ipaddress: h['interfaces'][0]['ip'],
-        use_ip: (! h['interfaces'][0]['useip'].to_i.zero?),
-        port: h['interfaces'][0]['port'].to_i,
+        interfaceid: interface['interfaceid'].to_i,
+        ipaddress: interface['ip'],
+        use_ip: (! interface['useip'].to_i.zero?),
+        port: interface['port'].to_i,
         group: h['groups'][0]['name'],
         group_create: nil,
         templates: h['parentTemplates'].map { |x| x['host']},
@@ -111,5 +114,44 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
   def destroy
     host = @resource[:hostname]
     zbx.hosts.delete(zbx.hosts.get_id(host: host))
+  end
+
+  #
+  # Helper methods
+  #
+
+  #
+  # zabbix_host properties
+  #
+  def ipaddress=(string)
+    zbx.query(
+      :method => 'hostinterface.update',
+      :params => {
+        interfaceid: @resource[:interfaceid],
+        ip: @resource[:ipaddress],
+      }
+    )
+  end
+
+  def use_ip=(boolean)
+    zbx.query(
+      :method => 'hostinterface.update',
+      :params => {
+        interfaceid: @resource[:interfaceid],
+        ip: @resource[:ipaddress],
+      }
+    )
+  end
+
+  def port=(int)
+  end
+
+  def group=(string)
+  end
+
+  def templates=(array)
+  end
+
+  def proxy=(string)
   end
 end
