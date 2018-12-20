@@ -42,7 +42,10 @@
 #   connection should me made via ip, not fqdn.
 #
 # [*zbx_group*]
-#   Name of thehostgroup where this host needs to be added.
+#   Deprecated! Name of the hostgroup where this host needs to be added.
+#
+# [*zbx_groups*]
+#   An array of hostgroups where this host needs to be added.
 #
 # [*zbx_templates*]
 #   List of templates which will be added when host is configured.
@@ -223,6 +226,7 @@ class zabbix::agent (
   $monitored_by_proxy                     = $zabbix::params::monitored_by_proxy,
   $agent_use_ip                           = $zabbix::params::agent_use_ip,
   $zbx_group                              = $zabbix::params::agent_zbx_group,
+  $zbx_groups                             = $zabbix::params::agent_zbx_groups,
   $zbx_group_create                       = $zabbix::params::agent_zbx_group_create,
   $zbx_templates                          = $zabbix::params::agent_zbx_templates,
   $agent_configfile_path                  = $zabbix::params::agent_configfile_path,
@@ -321,6 +325,22 @@ class zabbix::agent (
   # is set to false, you'll get warnings like this:
   # "Warning: You cannot collect without storeconfigs being set"
   if $manage_resources {
+    # Migrate deprecated zbx_group parameter
+    if $zbx_group == $zabbix::params::agent_zbx_group and $zbx_groups == $zabbix::params::agent_zbx_groups {
+      $groups = $zabbix::params::agent_zbx_groups
+    } else {
+      if $zbx_group != $zabbix::params::agent_zbx_group and $zbx_groups != $zabbix::params::agent_zbx_groups {
+        fail("Seems like you have filled zbx_group and zbx_groups with custom values. This isn't support! Please use zbx_groups only.")
+      }
+
+      if $zbx_group != $zabbix::params::agent_zbx_group {
+        warning('Passing zbx_group to zabbix::agent is deprecated and will be removed. Use zbx_groups instead.')
+        $groups = Array($zbx_group)
+      } else {
+        $groups = $zbx_groups
+      }
+    }
+
     if $monitored_by_proxy != '' {
       $use_proxy = $monitored_by_proxy
     } else {
@@ -333,7 +353,7 @@ class zabbix::agent (
       ipaddress    => $listen_ip,
       use_ip       => $agent_use_ip,
       port         => $listenport,
-      group        => $zbx_group,
+      groups       => $groups,
       group_create => $zbx_group_create,
       templates    => $zbx_templates,
       proxy        => $use_proxy,

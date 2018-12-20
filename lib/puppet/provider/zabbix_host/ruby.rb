@@ -26,7 +26,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
         ipaddress: interface['ip'],
         use_ip: (! interface['useip'].to_i.zero?),
         port: interface['port'].to_i,
-        group: h['groups'][0]['name'],
+        groups: h['groups'].map { |g| g['name'] },
         group_create: nil,
         templates: h['parentTemplates'].map { |x| x['host']},
         proxy: proxies.select { |name,id| id == h['proxy_hostid'] }.keys.first,
@@ -46,8 +46,8 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     template_ids = get_templateids(@resource[:templates])
     templates = transform_to_array_hash('templateid', template_ids)
 
-    gid = get_groupid(@resource[:group], @resource[:group_create])
-    groups = transform_to_array_hash('groupid', gid)
+    gids = get_groupids(@resource[:groups], @resource[:group_create])
+    groups = transform_to_array_hash('groupid', gids)
 
     proxy_hostid = proxy.nil? || proxy.empty? ? nil : zbx.proxies.get_id(host: @resource[:proxy])
 
@@ -81,18 +81,21 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
   #
   # Helper methods
   #
-  def get_groupid(name, create)
-    id = zbx.hostgroups.get_id(name: name)
-
-    if id.nil?
-      if create
-        zbx.hostgroups.create(name: name)
+  def get_groupids(group_array, create)
+    groupids = []
+    group_array.each do |g|
+      id = zbx.hostgroups.get_id(name: g)
+      if id.nil?
+        if create
+          groupids << zbx.hostgroups.create(name: g)
+        else
+          raise Puppet::Error, 'The hostgroup (' + g + ') does not exist in zabbix. Please use the correct one or set group_create => true.'
+        end
       else
-        raise Puppet::Error, 'The hostgroup (' + name + ') does not exist in zabbix. Please use the correct one or set group_create => true.'
+        groupids << id
       end
-    else
-      id
     end
+    groupids
   end
 
   def get_templateids(template_array)
@@ -138,12 +141,13 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     )
   end
 
-  def group=(hostgroup)
-    hostgroup_id = get_groupid(hostgroup, @resource[:group_create])
+  def groups=(hostgroups)
+    gids = get_groupids(hostgroups, @resource[:group_create])
+    groups = transform_to_array_hash('groupid', gids)
 
     zbx.hosts.create_or_update(
       host: @resource[:hostname],
-      groups: [groupid: hostgroup_id]
+      groups: [groupid: groups]
     )
   end
 

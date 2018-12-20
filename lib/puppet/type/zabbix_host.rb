@@ -4,6 +4,16 @@ Puppet::Type.newtype(:zabbix_host) do
     defaultto :present
   end
 
+  def initialize(*args)
+    super
+
+    # Migrate the group to groups
+    unless self[:group].nil?
+      self[:groups] = self[:group]
+      self.delete(:group)
+    end
+  end
+
   newparam(:hostname, namevar: true) do
     desc 'FQDN of the machine.'
   end
@@ -32,7 +42,18 @@ Puppet::Type.newtype(:zabbix_host) do
   end
 
   newproperty(:group) do
-    desc 'Name of the hostgroup.'
+    desc 'Deprecated! Name of the hostgroup.'
+
+    validate do |_value|
+      Puppet.warning('Passing group to zabbix_host is deprecated and will be removed. Use groups instead.')
+    end
+  end
+
+  newproperty(:groups, :array_matching => :all) do
+    desc 'An array of groups the host belongs to.'
+    def insync?(is)
+      is.sort == should.sort
+    end
   end
 
   newparam(:group_create) do
@@ -48,5 +69,9 @@ Puppet::Type.newtype(:zabbix_host) do
 
   newproperty(:proxy) do
     desc 'Whether it is monitored by an proxy or not.'
+  end
+
+  validate do
+    raise(_('The properties group and groups are mutually exclusive.')) if self[:group] and self[:groups]
   end
 end
