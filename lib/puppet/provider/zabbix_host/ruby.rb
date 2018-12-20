@@ -43,67 +43,30 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
   end
 
   def create
-    # Set some vars
-    host = @resource[:hostname]
-    ipaddress = @resource[:ipaddress]
-    use_ip = @resource[:use_ip]
-    port = @resource[:port]
-    hostgroup = @resource[:group]
-    hostgroup_create = @resource[:group_create]
-    templates = @resource[:templates]
-    proxy = @resource[:proxy]
+    template_ids = get_templateids(@resource[:templates])
+    templates = transform_to_array_hash('templateid', template_ids)
 
-    # Get the template ids.
-    template_array = []
-    if templates.is_a?(Array)
-      templates.each do |template|
-        template_id = get_template_id(zbx, template)
-        template_array.push template_id
-      end
-    else
-      template_array.push get_template_id(zbx, templates)
-    end
+    gid = get_groupid(@resource[:group], @resource[:group_create])
+    groups = transform_to_array_hash('groupid', gid)
 
-    # Check if we need to connect via ip or fqdn
-    use_ip = use_ip ? 1 : 0
-
-    # When using DNS you still have to send a value for ip
-    ipaddress = '' if ipaddress.nil? && use_ip.zero?
-
-    hostgroup_create = hostgroup_create ? 1 : 0
-
-    # First check if we have an correct hostgroup and if not, we raise an error.
-    search_hostgroup = zbx.hostgroups.get_id(name: hostgroup)
-    if search_hostgroup.nil? && hostgroup_create == 1
-      zbx.hostgroups.create(name: hostgroup)
-      search_hostgroup = zbx.hostgroups.get_id(name: hostgroup)
-    elsif search_hostgroup.nil? && hostgroup_create.zero?
-      raise Puppet::Error, 'The hostgroup (' + hostgroup + ') does not exist in zabbix. Please use the correct one.'
-    end
+    proxy_hostid = proxy.nil? || proxy.empty? ? nil : zbx.proxies.get_id(host: @resource[:proxy])
 
     # Now we create the host
-    hostid = zbx.hosts.create_or_update(
-      host: host,
+    zbx.hosts.create(
+      host: @resource[:hostname],
+      proxy_hostid: proxy_hostid,
       interfaces: [
         {
           type: 1,
           main: 1,
-          ip: ipaddress,
-          dns: host,
-          port: port,
-          useip: use_ip
+          ip: @resource[:ipaddress],
+          dns: @resource[:hostname],
+          port: @resource[:port],
+          useip: @resource[:use_ip] ? 1 : 0
         }
       ],
-      templates: template_array,
-      groups: [groupid: search_hostgroup]
-    )
-
-    zbx.templates.mass_add(hosts_id: [hostid], templates_id: template_array)
-
-    return if proxy.nil? || proxy.empty?
-    zbx.hosts.update(
-      hostid: zbx.hosts.get_id(host: host),
-      proxy_hostid: zbx.proxies.get_id(host: proxy)
+      templates: templates,
+      groups: groups,
     )
   end
 
@@ -112,13 +75,35 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
   end
 
   def destroy
-    host = @resource[:hostname]
-    zbx.hosts.delete(zbx.hosts.get_id(host: host))
+    zbx.hosts.delete(zbx.hosts.get_id(host: @resource[:hostname]))
   end
 
   #
   # Helper methods
   #
+  def get_groupid(name, create)
+    id = zbx.hostgroups.get_id(name: name)
+
+    if id.nil?
+      if create
+        zbx.hostgroups.create(name: name)
+      else
+        raise Puppet::Error, 'The hostgroup (' + name + ') does not exist in zabbix. Please use the correct one or set group_create => true.'
+      end
+    else
+      id
+    end
+  end
+
+  def get_templateids(template_array)
+    templateids = []
+    template_array.each do |t|
+      template_id = zbx.templates.get_id(host: t)
+      raise Puppet::Error, "The template #{t} does not exist in Zabbix. Please use a correct one." if template_id.nil?
+      templateids << template_id
+    end
+    templateids
+  end
 
   #
   # zabbix_host properties
@@ -128,7 +113,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
       :method => 'hostinterface.update',
       :params => {
         interfaceid: @resource[:interfaceid],
-        ip: @resource[:ipaddress],
+        ip: string,
       }
     )
   end
@@ -138,20 +123,58 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
       :method => 'hostinterface.update',
       :params => {
         interfaceid: @resource[:interfaceid],
-        ip: @resource[:ipaddress],
+        useip: boolean ? 1 : 0,
       }
     )
   end
 
   def port=(int)
+    zbx.query(
+      :method => 'hostinterface.update',
+      :params => {
+        interfaceid: @resource[:interfaceid],
+        port: int,
+      }
+    )
   end
 
-  def group=(string)
+  def group=(hostgroup)
+    hostgroup_id = get_groupid(hostgroup, @resource[:group_create])
+
+    zbx.hosts.create_or_update(
+      host: @resource[:hostname],
+      groups: [groupid: hostgroup_id]
+    )
   end
 
   def templates=(array)
+    should_template_ids = get_templateids(array)
+
+    # Get templates we have to clear. Unlinking only isn't really helpful.
+    is_template_ids = zbx.query(
+      method: 'host.get',
+      params: {
+        hostids: @resource[:id],
+        selectParentTemplates: ['templateid'],
+        output: ['host']
+      }
+    ).first['parentTemplates'].map { |t| t['templateid'].to_i }
+    templates_clear = is_template_ids - should_template_ids
+
+    zbx.query(
+      :method => 'host.update',
+      :params => {
+        hostids: @resource[:id],
+        templates: transform_to_array_hash( 'templateid', should_template_ids),
+        templates_clear: transform_to_array_hash( 'templateid', templates_clear),
+      }
+    )
   end
 
   def proxy=(string)
+    zbx.hosts.create_or_update(
+      host: @resource[:hostname],
+      proxy_hostid: zbx.proxies.get_id(host: string)
+    )
   end
 end

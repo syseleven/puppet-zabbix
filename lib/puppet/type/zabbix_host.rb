@@ -8,6 +8,14 @@ Puppet::Type.newtype(:zabbix_host) do
     desc 'FQDN of the machine.'
   end
 
+  newproperty(:id, :readonly => true) do
+    desc 'Internally used hostid'
+  end
+
+  newproperty(:interfaceid, :readonly => true) do
+    desc 'Internally used identifier for the host interface'
+  end
+
   newproperty(:ipaddress) do
     desc 'The IP address of the machine running zabbix agent.'
   end

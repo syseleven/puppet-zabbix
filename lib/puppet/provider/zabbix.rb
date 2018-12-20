@@ -96,6 +96,10 @@ class Puppet::Provider::Zabbix < Puppet::Provider
     template_array.include?(template_id.to_s)
   end
 
+  def transform_to_array_hash(key, value_array)
+    value_array.map { |a| { key => a } }
+  end
+
   # Is it a number?
   def a_number?(s)
     s.to_s.match(%r{\A[+-]?\d+?(\.\d+)?\Z}).nil? ? false : true
