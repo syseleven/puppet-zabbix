@@ -115,7 +115,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     zbx.query(
       :method => 'hostinterface.update',
       :params => {
-        interfaceid: @resource[:interfaceid],
+        interfaceid: @property_hash[:interfaceid],
         ip: string,
       }
     )
@@ -125,7 +125,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     zbx.query(
       :method => 'hostinterface.update',
       :params => {
-        interfaceid: @resource[:interfaceid],
+        interfaceid: @property_hash[:interfaceid],
         useip: boolean ? 1 : 0,
       }
     )
@@ -135,7 +135,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     zbx.query(
       :method => 'hostinterface.update',
       :params => {
-        interfaceid: @resource[:interfaceid],
+        interfaceid: @property_hash[:interfaceid],
         port: int,
       }
     )
@@ -147,7 +147,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
 
     zbx.hosts.create_or_update(
       host: @resource[:hostname],
-      groups: [groupid: groups]
+      groups: groups
     )
   end
 
@@ -158,7 +158,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     is_template_ids = zbx.query(
       method: 'host.get',
       params: {
-        hostids: @resource[:id],
+        hostids: @property_hash[:id],
         selectParentTemplates: ['templateid'],
         output: ['host']
       }
@@ -168,7 +168,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     zbx.query(
       :method => 'host.update',
       :params => {
-        hostids: @resource[:id],
+        hostids: @property_hash[:id],
         templates: transform_to_array_hash( 'templateid', should_template_ids),
         templates_clear: transform_to_array_hash( 'templateid', templates_clear),
       }
