@@ -2,8 +2,6 @@ require_relative '../zabbix'
 Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix) do
   confine feature: :zabbixapi
 
-  mk_resource_methods
-
   def self.instances
     proxies = zbx.proxies.all
     api_hosts = self.zbx.query(
@@ -111,6 +109,8 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
   #
   # zabbix_host properties
   #
+  mk_resource_methods
+
   def ipaddress=(string)
     zbx.query(
       :method => 'hostinterface.update',
