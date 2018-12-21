@@ -14,6 +14,17 @@ Puppet::Type.newtype(:zabbix_host) do
     end
   end
 
+  def munge_boolean(value)
+    case value
+    when true, 'true', :true
+      :true
+    when false, 'false', :false
+      :false
+    else
+      raise(Puppet::Error, 'munge_boolean only takes booleans')
+    end
+  end
+
   newparam(:hostname, namevar: true) do
     desc 'FQDN of the machine.'
   end
@@ -30,8 +41,14 @@ Puppet::Type.newtype(:zabbix_host) do
     desc 'The IP address of the machine running zabbix agent.'
   end
 
-  newproperty(:use_ip) do
-    desc 'Using ipadress instead of dns to connect. Is used by the zabbix-api command.'
+  newproperty(:use_ip, :boolean => true) do
+    desc 'Using ipadress instead of dns to connect.'
+
+    newvalues(:true, :false)
+
+    munge do |value|
+      @resource.munge_boolean(value)
+    end
   end
 
   newproperty(:port) do

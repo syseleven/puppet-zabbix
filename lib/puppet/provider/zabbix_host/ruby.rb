@@ -16,13 +16,14 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
 
     api_hosts.map do |h|
       interface = h['interfaces'].select { |i| i['type'].to_i == 1 and i['main'].to_i == 1 }.first
+      use_ip = (! interface['useip'].to_i.zero?)
       new(
         ensure: :present,
         id: h['hostid'].to_i,
         name: h['host'],
         interfaceid: interface['interfaceid'].to_i,
         ipaddress: interface['ip'],
-        use_ip: (! interface['useip'].to_i.zero?),
+        use_ip: use_ip.to_s.to_sym,
         port: interface['port'].to_i,
         groups: h['groups'].map { |g| g['name'] },
         group_create: nil,
@@ -126,7 +127,8 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
       :method => 'hostinterface.update',
       :params => {
         interfaceid: @property_hash[:interfaceid],
-        useip: boolean ? 1 : 0,
+        useip: boolean == :true ? 1 : 0,
+        dns: @resource[:hostname],
       }
     )
   end
