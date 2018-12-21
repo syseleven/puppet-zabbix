@@ -170,7 +170,7 @@ Puppet::Type.type(:zabbix_host).provide(:ruby, parent: Puppet::Provider::Zabbix)
     zbx.query(
       :method => 'host.update',
       :params => {
-        hostids: @property_hash[:id],
+        hostid: @property_hash[:id],
         templates: transform_to_array_hash( 'templateid', should_template_ids),
         templates_clear: transform_to_array_hash( 'templateid', templates_clear),
       }
